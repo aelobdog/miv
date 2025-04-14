@@ -21,13 +21,25 @@ end
 local visual_line_start = nil
 local visual_line_end = nil
 
+local visual_col_start = nil
+local visual_col_end = nil
+
 -- ----------------------------------------------------------------------------
+
+local function update_visual_line_selection()
+  local doc = core.active_view.doc
+  local start_line = visual_line_start
+  local end_line = visual_line_end
+  doc:set_selection(end_line, 0, start_line, 0)
+end
 
 local function update_visual_selection()
   local doc = core.active_view.doc
   local start_line = visual_line_start
   local end_line = visual_line_end
-  doc:set_selection(end_line, 0, start_line, 0)
+  local start_col = visual_col_start
+  local end_col = visual_col_end
+  doc:set_selection(end_line, end_col, start_line, start_col)
 end
 
 -- ----------------------------------------------------------------------------
@@ -43,7 +55,6 @@ miv.normal_mode_map = {
   ["up"] = function() command.perform("doc:move-to-previous-line") end,
   ["0"] = function() command.perform("doc:move-to-start-of-line") end,
   ["$"] = function() command.perform("doc:move-to-end-of-line") end,
-  ["w"] = function() command.perform("doc:move-to-next-word-start") end,
   ["b"] = function() command.perform("doc:move-to-previous-word-start") end,
   ["e"] = function() command.perform("doc:move-to-next-word-end") end,
   ["g g"] = function() command.perform("doc:move-to-start-of-doc") end,
@@ -53,11 +64,20 @@ miv.normal_mode_map = {
   ["{"] = function() command.perform("doc:move-to-previous-block-start") end,
   ["}"] = function() command.perform("doc:move-to-next-block-end") end,
   ["i"] = function() miv.set_mode("insert") end,
-  ["V"] = function(dv)
+  ["V"] = function()
     miv.set_mode("visual-lines")
     local line = core.active_view.doc:get_selection(true)
     visual_line_start = line
     visual_line_end = line + 1
+    update_visual_line_selection()
+  end,
+  ["v"] = function()
+    miv.set_mode("visual")
+    local line, col = core.active_view.doc:get_selection(true)
+    visual_line_start = line
+    visual_line_end = line
+    visual_col_start = col
+    visual_col_end = col
     update_visual_selection()
   end
 }
@@ -171,32 +191,92 @@ miv.visual_line_mode_map = {
   ["escape"] = function()
     miv.set_mode("normal")
     visual_line_start = visual_line_end 
-    update_visual_selection()
+    update_visual_line_selection()
     visual_line_start = nil
     visual_line_end = nil
   end,
   ["j"] = function()
     visual_line_end = visual_line_end + 1
-    update_visual_selection()
+    update_visual_line_selection()
   end,
   ["k"] = function()
     -- TODO: there's a known issue where if we're selecting some lines
     --       and we move the cursor up, we end up with a "no-selection"
     --       when we come up the the first line that was selected ...
     visual_line_end = visual_line_end - 1
-    update_visual_selection()
+    update_visual_line_selection()
   end,
   ["d"] = function()
     miv.set_mode("normal")
     local doc = core.active_view.doc
     doc:remove(visual_line_start, 0, visual_line_end, 0)
     visual_line_end = visual_line_start
+    update_visual_line_selection()
+    visual_line_start = nil
+    visual_line_end = nil
+  end,
+  ["g g"] = function()
+    visual_line_end = 1
+    update_visual_line_selection()
+  end,
+  ["G"] = function()
+    local doc = core.active_view.doc
+    visual_line_end = #doc.lines
+    update_visual_line_selection()
+  end,
+}
+
+miv.visual_mode_map = {
+  ["escape"] = function()
+    miv.set_mode("normal")
+    visual_line_start = visual_line_end
+    visual_col_start = visual_col_end 
     update_visual_selection()
     visual_line_start = nil
     visual_line_end = nil
-  end
+    visual_col_start = nil
+    visual_col_end = nil
+  end,
+  ["j"] = function()
+    visual_line_end = visual_line_end + 1
+    visual_col_end = visual_col_start
+    update_visual_selection()
+  end,
+  ["k"] = function()
+    visual_line_end = visual_line_end - 1
+    visual_col_end = visual_col_start
+    update_visual_selection()
+  end,
+  ["h"] = function()
+    visual_col_end = visual_col_end - 1
+    update_visual_selection()
+  end,
+  ["l"] = function()
+    visual_col_end = visual_col_end + 1
+    update_visual_selection()
+  end,
+  ["d"] = function()
+    miv.set_mode("normal")
+    local doc = core.active_view.doc
+    doc:remove(visual_line_start, visual_col_start, visual_line_end, visual_col_end)
+    visual_line_end = visual_line_start
+    visual_col_end = visual_col_start
+    update_visual_selection()
+    visual_line_start = nil
+    visual_line_end = nil
+    visual_col_start = nil
+    visual_col_end = nil
+  end,
+  ["g g"] = function()
+    visual_line_end = 1
+    update_visual_selection()
+  end,
+  ["G"] = function()
+    local doc = core.active_view.doc
+    visual_line_end = #doc.lines
+    update_visual_selection()
+  end,
 }
-
 -- ----------------------------------------------------------------------------
 
 local old_on_key_pressed = keymap.on_key_pressed
@@ -276,6 +356,8 @@ local function handle_keystroke(stroke)
     current_mode_map = miv.insert_mode_map
   elseif miv.mode == "visual-lines" then
     current_mode_map = miv.visual_line_mode_map
+  elseif miv.mode == "visual" then
+    current_mode_map = miv.visual_mode_map
   end
 
   table.insert(miv.key_buffer, stroke)
