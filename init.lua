@@ -3,6 +3,7 @@
 local core = require "core"
 local command = require "core.command"
 local keymap = require "core.keymap"
+local CommandView = require "core.commandview"
 
 -- ----------------------------------------------------------------------------
 local miv = require "plugins.miv.miv"
@@ -39,14 +40,14 @@ end
 
 
 local function shifted(key)
-  if key:match("%l") then
+  if #key == 1 and key:match("%l") then
       return key:upper()
   end
 
   local shift_map = {
       ["1"] = "!",  ["2"] = "@", ["3"] = "#",  ["4"] = "$",
       ["5"] = "%",  ["6"] = "^", ["7"] = "&",  ["8"] = "*",
-      ["9"] = "(",  ["0"] = ")", ["-"] = "_",  ["="] = "+",
+      ["9"] = "(",  ["0"] = ")", ["minus"] = "_",  ["="] = "+",
       ["["] = "{",  ["]"] = "}", ["\\"] = "|", [";"] = ":",
       ["'"] = "\"", [","] = "<", ["."] = ">",  ["/"] = "?",
       ["`"] = "~"
@@ -148,6 +149,8 @@ local function make_stroke(key)
     end
   end
 
+  if stroke == "-" then stroke = "minus" end
+
   if S then stroke = "S-" .. stroke end
   if M then stroke = "M-" .. stroke end
   if C then stroke = "C-" .. stroke end
@@ -165,7 +168,7 @@ function keymap.on_key_pressed(k, ...)
   end
   local stroke = make_stroke(k)
 
-  if stroke:find("wheel") or stroke:find("click") then
+  if stroke:find("wheel") or stroke:find("click") or core.active_view:is(CommandView) then
     return old_on_key_pressed(k, ...)
   else
     handle_keystroke(stroke)

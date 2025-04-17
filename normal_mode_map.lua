@@ -22,6 +22,16 @@ local normal_mode_map = {
     ["C-r"] = function() command.perform("doc:redo") end,
     ["{"] = function() command.perform("doc:move-to-previous-block-start") end,
     ["}"] = function() command.perform("doc:move-to-next-block-end") end,
+    ["d d"] = function()
+        local doc = core.active_view.doc
+        local line = doc:get_selection(true)
+        doc:remove(line, 0, line + 1, 0)
+    end,
+    ["x"] = function()
+        local doc = core.active_view.doc
+        local line, col = doc:get_selection(true)
+        doc:remove(line, col, line, col + 1)
+    end,
     ["i"] = function() miv.set_mode("insert") end,
     ["V"] = function()
         miv.set_mode("visual-lines")
